@@ -16,6 +16,15 @@ def load_thor_model():
     base = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet', pooling='avg')
     out = layers.Dense(37, activation='softmax')(base.output)
     model = Model(inputs=base.input, outputs=out)
+
+    url = ''
+    output = 'Thor_v1.h5'
+
+    if not os.path.exists(output):
+        gdown.download(url, output, quiet=False)
+
+    model.load_weights(output, by_name=True, skip_mismatch=True)
+
     return model
 
 model = load_thor_model()
