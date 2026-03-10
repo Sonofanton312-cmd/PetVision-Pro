@@ -16,16 +16,6 @@ def load_thor_model():
     base = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet', pooling='avg')
     out = layers.Dense(37, activation='softmax')(base.output)
     model = Model(inputs=base.input, outputs=out)
-
-    file_id = '1i7OmSITxJqdrF4ApwY-Ae2XiKjnUyyL9'
-    url = f'{file_id}'
-    output = 'Thor_v1.h5'
-
-    if not os.path.exists(output):
-        gdown.download(url, output, quiet=False)
-
-    model.load_weights(output, by_name=True, skip_mismatch=True)
-
     return model
 
 model = load_thor_model()
@@ -36,9 +26,7 @@ uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert('RGB')
     st.image(image, use_container_width=True)
-
     img = image.resize((128, 128))
     img_array = np.array(img)
     img_array = np.expand_dims(img_array, axis=0)
-
     img_pre = preprocess_input(img_array.astype(np.float32))
