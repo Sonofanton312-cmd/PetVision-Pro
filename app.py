@@ -1,5 +1,6 @@
 import streamlit as st
 import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras import layers, Model
 from PIL import Image
@@ -9,7 +10,7 @@ import os
 
 st.set_page_config(page_title="PetVision Pro - Thor System", layout="centered")
 
-# The list of breeds in the exact order the model was trained
+# The Correct Breed Map
 BREEDS = [
     'Abyssinian','Bengal','Birman','Bombay','British_Shorthair','Egyptian_Mau',
     'Maine_Coon','Persian','Ragdoll','Russian_Blue','Siamese','Sphynx',
@@ -39,7 +40,7 @@ def load_thor_model():
 model = load_thor_model()
 
 st.title("⚡ Thor Pet Classifier")
-st.write("Upload a photo to see the name and confidence strike.")
+st.write("Upload a photo to see the high-accuracy breed strike.")
 
 uploaded_file = st.file_uploader(
     "Choose an image...",
@@ -52,7 +53,8 @@ if uploaded_file is not None:
 
     # Preprocess image
     img = image.resize((128, 128))
-    img_array = np.array(img) / 255.0
+    img_array = np.array(img)
+    img_array = preprocess_input(img_array)
     img_array = np.expand_dims(img_array, axis=0)
 
     # Prediction
@@ -60,7 +62,7 @@ if uploaded_file is not None:
     class_index = np.argmax(prediction)
     confidence = np.max(prediction)
 
-    breed_name = BREEDS[class_index]
+    breed = BREEDS[class_index]
 
-    st.subheader(f"Predicted Breed: {breed_name}")
+    st.subheader(f"Predicted Breed: {breed}")
     st.write(f"Confidence: {confidence*100:.2f}%")
