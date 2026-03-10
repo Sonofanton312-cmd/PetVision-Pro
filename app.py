@@ -33,14 +33,13 @@ st.write("---")
 # --- 2. MODEL LOADING ---
 @st.cache_resource
 def load_my_model():
-    # REMOVED D: DRIVE PATH - Now looks in the same folder as this script
     model_path = 'pet_classifier_PRO_v1.h5'
-    return tf.keras.models.load_model(model_path)
+    # FIXED: Added compile=False to bypass the DepthwiseConv2D error on Streamlit Cloud
+    return tf.keras.models.load_model(model_path, compile=False)
 
 model = load_my_model()
 
 # --- 3. HARD-CODED LABELS ---
-# These are the 37 breeds in alphabetical order (exactly how Keras sees folders)
 unique_labels = [
     'Abyssinian', 'Bengal', 'Birman', 'Bombay', 'British_Shorthair', 'Egyptian_Mau', 
     'Maine_Coon', 'Persian', 'Ragdoll', 'Russian_Blue', 'Siamese', 'Sphynx', 
@@ -66,16 +65,12 @@ with col2:
     st.subheader("AI Analysis")
     if uploaded_file:
         with st.spinner('Calculating probabilities...'):
-            # Preprocessing (Match your training 128x128)
             img_resized = image.resize((128, 128))
             img_array = tf.keras.preprocessing.image.img_to_array(img_resized)
             img_array = np.expand_dims(img_array, axis=0)
             img_array = preprocess_input(img_array)
             
-            # Make Prediction
             preds = model.predict(img_array)[0]
-            
-            # Get Top 3 results
             top_3_indices = preds.argsort()[-3:][::-1]
             
             for i in top_3_indices:
