@@ -8,7 +8,7 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 # --- 1. CONFIG & STYLING ---
 st.set_page_config(page_title="PetVision Pro", page_icon="🐾", layout="centered")
 
-# Custom CSS for the "Classy" look
+# Custom CSS for the "Classy" UI
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
@@ -30,12 +30,24 @@ st.title("🐾 PetVision Pro")
 st.write("High-precision breed identification powered by Deep Learning.")
 st.write("---")
 
-# --- 2. MODEL LOADING ---
+# --- 2. MODEL LOADING (WITH UNIVERSAL VERSION FIX) ---
 @st.cache_resource
 def load_my_model():
     model_path = 'pet_classifier_PRO_v1.h5'
-    # FIXED: Added compile=False to bypass the DepthwiseConv2D error on Streamlit Cloud
-    return tf.keras.models.load_model(model_path, compile=False)
+    
+    # Custom class to handle the 'groups' parameter mismatch on Streamlit Cloud
+    class FixedDepthwiseConv2D(tf.keras.layers.DepthwiseConv2D):
+        def __init__(self, **kwargs):
+            if 'groups' in kwargs:
+                kwargs.pop('groups')
+            super().__init__(**kwargs)
+
+    # Load model using the custom fixed layer
+    return tf.keras.models.load_model(
+        model_path, 
+        custom_objects={'DepthwiseConv2D': FixedDepthwiseConv2D},
+        compile=False
+    )
 
 model = load_my_model()
 
@@ -58,6 +70,7 @@ with col1:
     st.subheader("Input")
     uploaded_file = st.file_uploader("Upload a Pet Photo", type=["jpg", "jpeg", "png"])
     if uploaded_file:
+        # Convert to RGB to fix 4-channel PNG errors
         image = Image.open(uploaded_file).convert('RGB')
         st.image(image, caption='Uploaded Photo', use_container_width=True)
 
@@ -65,12 +78,16 @@ with col2:
     st.subheader("AI Analysis")
     if uploaded_file:
         with st.spinner('Calculating probabilities...'):
+            # Preprocessing (Match your training 128x128)
             img_resized = image.resize((128, 128))
             img_array = tf.keras.preprocessing.image.img_to_array(img_resized)
             img_array = np.expand_dims(img_array, axis=0)
             img_array = preprocess_input(img_array)
             
+            # Make Prediction
             preds = model.predict(img_array)[0]
+            
+            # Get Top 3 results
             top_3_indices = preds.argsort()[-3:][::-1]
             
             for i in top_3_indices:
@@ -78,7 +95,7 @@ with col2:
                 confidence = preds[i] * 100
                 
                 st.write(f"**{label}**")
-                st.progress(int(confidence))
+                st.progress(float(preds[i]))
                 st.write(f"{confidence:.2f}%")
                 st.write("") 
 
