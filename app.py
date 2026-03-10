@@ -7,27 +7,32 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 # --- 1. CONFIG ---
 st.set_page_config(page_title="PetVision Pro", page_icon="🐾")
 
-# --- 2. MODEL LOADING (NO CACHE TO PREVENT GRAPH ERRORS) ---
+# --- 2. MODEL LOADING (BYPASSING THE DUAL-TENSOR BUG) ---
+@st.cache_resource
 def load_my_model():
     model_path = 'pet_classifier_PRO_v1.h5'
     
-    # Custom class for the version fix
     class FixedDepthwiseConv2D(tf.keras.layers.DepthwiseConv2D):
         def __init__(self, **kwargs):
             if 'groups' in kwargs: kwargs.pop('groups')
             super().__init__(**kwargs)
 
-    return tf.keras.models.load_model(
+    # Load the model with 'compile=False' to avoid optimizer conflicts
+    base_model = tf.keras.models.load_model(
         model_path, 
         custom_objects={'DepthwiseConv2D': FixedDepthwiseConv2D},
         compile=False
     )
+    
+    # REBUILDING THE PREDICTION PATH: This forces Keras to only accept 1 input
+    # It essentially "rewires" the circuit to ensure only one signal pin is active
+    inputs = tf.keras.Input(shape=(128, 128, 3))
+    outputs = base_model(inputs, training=False)
+    new_model = tf.keras.Model(inputs, outputs)
+    
+    return new_model
 
-# Load once per run
-if 'model' not in st.session_state:
-    st.session_state.model = load_my_model()
-
-model = st.session_state.model
+model = load_my_model()
 
 # --- 3. LABELS ---
 unique_labels = [
@@ -50,21 +55,23 @@ if uploaded_file:
     st.image(image, use_container_width=True)
     
     with st.spinner('Analyzing...'):
-        # 1. Resize
+        # 1. Resize & Array conversion
         img_resized = image.resize((128, 128))
-        # 2. Convert to array
         img_array = tf.keras.preprocessing.image.img_to_array(img_resized)
-        # 3. Add Batch Dimension (None, 128, 128, 3)
+        
+        # 2. Add Batch Dimension [1, 128, 128, 3]
         img_array = np.expand_dims(img_array, axis=0)
-        # 4. MobileNet Preprocessing
+        
+        # 3. MobileNet Preprocessing
         img_preprocessed = preprocess_input(img_array)
         
-        # 5. Predict using the standard method
+        # 4. Predict
         preds = model.predict(img_preprocessed)[0]
         
         top_3 = preds.argsort()[-3:][::-1]
         st.subheader("Results:")
         for i in top_3:
             label = unique_labels[i].replace('_', ' ').title()
-            st.write(f"**{label}**: {preds[i]*100:.1f}%")
+            st.write(f"**{label}**")
             st.progress(float(preds[i]))
+            st.write(f"{preds[i]*100:.1f}%")
